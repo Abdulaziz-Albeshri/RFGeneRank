@@ -1,0 +1,96 @@
+Package: RFGeneRank
+Title: Robust Random-Forest Gene Ranking for Transcriptomics
+Version: 0.99.0
+Authors@R: c(
+    person("Abdulaziz", "Albeshri",
+           email = "a.z.a1410@hotmail.com",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-0718-2439")),
+    person("Thamer", "Ahmad Bouback",
+           email = "Tbouback@kau.edu.sa",
+           role = "ctb"),    
+    person("Majid", "Al-Zahrani",
+           email = "maalzahrani4@kau.edu.sa",
+           role = "ctb"),
+    person("Tasneem", "Alsahafi",
+           email = "Talsahafi0015@stu.kau.edu.sa",
+           role = "ctb")
+ )
+Description: Tools to harmonize bulk RNA-seq matrices, optionally apply frozen or standard 
+             batch correction, and train cross-validated classification models using 
+             ranger, glmnet, or xgboost. Supports leakage-safe feature selection, 
+             permutation importance, SHAP-based interpretability, and calibration 
+             methods (Platt or isotonic). Provides stability metrics across folds, 
+             embeddings (PCA/UMAP), ROC visualization, SHAP dependence plots, and tidy 
+             ranked-gene tables for downstream analysis.
+License: MIT + file LICENSE
+URL: https://github.com/USER/RFGeneRank
+BugReports: https://github.com/USER/RFGeneRank/issues
+Depends: 
+    R (>= 4.4.0)
+Imports: 
+    ggplot2,
+    limma,
+    methods,
+    pROC,
+    ranger,
+    stats,
+    SummarizedExperiment,
+    sva,
+    AnnotationDbi,
+    umap,
+    scales,
+    utils,
+    S4Vectors,
+    digest,
+    mgcv,
+    Matrix,
+    glmnet,
+    xgboost,
+    neuroCombat,
+    patchwork
+Suggests:
+    GEOquery,
+    Biobase,
+    edgeR,
+    uwot, 
+    BiocStyle,
+    knitr,
+    org.Hs.eg.db,
+    testthat (>= 3.0.0),
+    rmarkdown,
+    DESeq2,
+    MASS,
+    matrixStats,
+    BiocGenerics,
+    fastshap,
+    caret
+VignetteBuilder: 
+    knitr
+biocViews: Transcriptomics, RNASeq, GeneExpression, FeatureExtraction,
+    Classification, Visualization, Software, StatisticalMethod, Alignment
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Collate:
+    'globals.R'
+    'class_def.R'
+    'check_utils.R'
+    'batch_correct.R'
+    'calibrate.R'
+    'combat_helpers.R'
+    'compute_class_weights.R'
+    'confounding.R'
+    'crossval.R'
+    'id_map.R'
+    'plots_all.R'
+    'prepare_data.R'
+    'align_datasets.R'
+    'rank_genes.R'
+    'top_genes.R'
+    'Rzzz.R'
+    'package-doc.R'
+    'sign_importance.R'
+    'factor_dependence.R'
+    'validate_genes.R'

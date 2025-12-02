@@ -1,0 +1,20 @@
+---
+title: "RFGeneRank: Quick Start"
+package: RFGeneRank
+output:
+  BiocStyle::html_document:
+    toc: true
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{RFGeneRank: Quick Start}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>", message=FALSE, warning=FALSE)
+
+## Session information
+
+```{r session-info, echo=FALSE}
+sessionInfo()
