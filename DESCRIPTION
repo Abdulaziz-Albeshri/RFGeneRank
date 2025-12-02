@@ -24,8 +24,8 @@ Description: Tools to harmonize bulk RNA-seq matrices, optionally apply frozen o
              embeddings (PCA/UMAP), ROC visualization, SHAP dependence plots, and tidy 
              ranked-gene tables for downstream analysis.
 License: MIT + file LICENSE
-URL: https://github.com/USER/RFGeneRank
-BugReports: https://github.com/USER/RFGeneRank/issues
+URL: https://github.com/Abdulaziz-Albeshri/RFGeneRank
+BugReports: https://github.com/Abdulaziz-Albeshri/RFGeneRank/issues
 Depends: 
     R (>= 4.4.0)
 Imports: 
