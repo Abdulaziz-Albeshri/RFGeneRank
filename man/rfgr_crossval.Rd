@@ -12,7 +12,7 @@ rfgr_crossval(
   covariates = NULL,
   cv = c("lobo", "groupk", "kfold"),
   k = 5,
-  combat_mode = c("none", "train", "regular"),
+  combat_mode = c("none", "train"),
   rf_trees = 1000,
   seed = 1,
   verbose = TRUE
@@ -33,7 +33,7 @@ rfgr_crossval(
 
 \item{k}{integer; number of folds for "groupk" or "kfold"}
 
-\item{combat_mode}{one of c("none","train","regular")}
+\item{combat_mode}{one of c("none","train")}
 
 \item{rf_trees}{integer; number of trees for ranger}
 
@@ -45,11 +45,10 @@ rfgr_crossval(
 list(auc_by_fold, mean_auc, settings, folds_info)
 }
 \description{
-Orchestrates leakage-safe CV for RFGeneRank with three ComBat modes:
+Orchestrates leakage-safe CV for RFGeneRank with two ComBat modes:
 \itemize{
 \item "none":     no batch correction
 \item "train":    frozen ComBat - fit on TRAIN folds only; apply TRAIN parameters to TEST
-\item "regular":  ComBat on ALL samples before splitting (leaky; exploratory)
 }
 
 Supports LOBO (leave-one-batch-out), Group K-Fold by batch, and standard K-Fold.
