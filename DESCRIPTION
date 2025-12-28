@@ -1,5 +1,5 @@
 Package: RFGeneRank
-Title: Robust Random-Forest Gene Ranking for Transcriptomics
+Title: RFGeneRank: Cross-validated, stable predictive gene ranking for transcriptomics
 Version: 0.99.0
 Authors@R: c(
     person("Abdulaziz", "Albeshri",
