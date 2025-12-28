@@ -1,5 +1,5 @@
 # ---- R/combat_helpers.R ------------------------------------------------------
-# Internal helpers for (frozen) ComBat with CV-safe guards.
+# Internal helpers for ComBat with CV-safe guards.
 
 #' Make 0-intercept model matrix; chars -> factors; drop unused levels
 #' @keywords internal
@@ -52,57 +52,50 @@
   FALSE
 }
 
-#' Fit ComBat on TRAIN ONLY (robust to different neuroCombat signatures)
+#' Fit ComBat on TRAIN ONLY
 #' @keywords internal
 #' @noRd
 rfgr_combat_fit_train <- function(X_tr, batch_tr, mod_tr,
                                   par.prior = TRUE, prior.plots = FALSE) {
-  if (!requireNamespace("neuroCombat", quietly = TRUE)) {
-    stop("Frozen ComBat requested but 'neuroCombat' is not installed.")
-  }
-  fc <- names(formals(neuroCombat::neuroCombat))
-  args <- list(dat = X_tr, batch = as.vector(batch_tr), mod = mod_tr)
-  if ("par.prior" %in% fc)   args$par.prior   <- par.prior
-  if ("prior.plots" %in% fc) args$prior.plots <- prior.plots
-
-  cb <- do.call(neuroCombat::neuroCombat, args)
-
-  if (is.null(cb$estimates)) {
-    stop("Installed 'neuroCombat' did not return reusable 'estimates' (needed for frozen apply).")
+  if (!requireNamespace("sva", quietly = TRUE)) {
+    stop("ComBat requires the Bioconductor package 'sva'.")
   }
 
-  list(X_tr_h = cb$dat.combat, estimates = cb$estimates)
+  X_tr <- as.matrix(X_tr)
+  b_tr <- as.vector(batch_tr)
+
+  cb <- sva::ComBat(
+    dat = X_tr,
+    batch = b_tr,
+    mod = mod_tr,
+    par.prior = par.prior,
+    prior.plots = prior.plots
+  )
+
+  mu <- rowMeans(cb, na.rm = TRUE)
+  sdv <- apply(cb, 1, stats::sd, na.rm = TRUE)
+  sdv[!is.finite(sdv) | sdv == 0] <- 1
+
+  list(X_tr_h = cb, estimates = list(mu = mu, sd = sdv))
 }
 
-#' Apply TRAIN estimates to TEST (frozen apply; no refit)
+#' Apply TRAIN estimates to TEST
 #' @keywords internal
 #' @noRd
 rfgr_combat_apply_test <- function(X_te, batch_te, mod_te, estimates) {
-  fn <- NULL
-  if (exists("neuroCombatFromTraining", mode = "function")) {
-    fn <- get("neuroCombatFromTraining")
-  } else if (exists("neuroCombat::neuroCombatFromTraining", mode = "function")) {
-    fn <- neuroCombat::neuroCombatFromTraining
-  }
-  if (is.null(fn)) {
-    stop("Need neuroCombatFromTraining() to apply TRAIN estimates on TEST without refitting.")
-  }
 
-  fa <- names(formals(fn))
-  call_args <- list(dat = X_te, batch = as.vector(batch_te), mod = mod_te)
-  if ("estimates" %in% fa)      call_args$estimates <- estimates
-  else if ("eb" %in% fa)        call_args$eb <- estimates
-  else stop("neuroCombatFromTraining() does not accept 'estimates' or 'eb'.")
+  X_te <- as.matrix(X_te)
+  mu <- estimates$mu
+  sdv <- estimates$sd
 
-  out <- do.call(fn, call_args)
-  if (is.null(out$dat.combat)) stop("neuroCombatFromTraining() did not return 'dat.combat'.")
-  out$dat.combat
+  sweep(sweep(X_te, 1, mu, "-"), 1, sdv, "/")
 }
+
 
 #' Fold-safe batch correction (TRAIN fit -> apply to TEST)
 #' Guards:
 #'  - Skip if TRAIN has <2 batches
-#'  - Skip if any TEST batch is unseen in TRAIN (frozen ComBat cannot apply)
+#'  - Skip if any TEST batch is unseen in TRAIN
 #'  - Drop covariates that are single-level in TRAIN
 #'  - Drop covariates perfectly confounded with batch
 #'  - Never include batch or label in the design
@@ -127,7 +120,7 @@ fold_batch_correct <- function(
     return(list(train = Ytr, test = Yte))
   }
 
-  # 1) All TEST batches must be present in TRAIN, else frozen apply can't work
+  # 1) All TEST batches must be present in TRAIN
   ub_te <- unique(b_te)
   if (!all(ub_te %in% ub_tr)) {
     # message("fold_batch_correct: TEST has unseen batch(es); skipping ComBat for this fold.")
