@@ -222,7 +222,7 @@ if (is.null(batch_covariates) && "..batch_covariates" %in% names(meta)) {
     X_te <- expr[, te, drop = FALSE]
     y_tr <- y[tr]
 
-    # Train-only constant-gene drop (avoid neuroCombat constant-row error)
+    # Train-only constant-gene drop (avoid constant-row issues in batch correction)
     dc <- .drop_constant_train(X_tr, X_te, eps = 1e-12)
     X_tr <- dc$X_tr; X_te <- dc$X_te
 
@@ -357,3 +357,4 @@ if (is.null(batch_covariates) && "..batch_covariates" %in% names(meta)) {
       var_pca  = var_pca,
       calibration = list())
 }
+
