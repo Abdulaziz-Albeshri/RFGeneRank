@@ -16,13 +16,12 @@ Authors@R: c(
            email = "Talsahafi0015@stu.kau.edu.sa",
            role = "ctb")
  )
-Description: Tools to harmonize bulk RNA-seq matrices, optionally apply frozen or standard 
-             batch correction, and train cross-validated classification models using 
-             ranger, glmnet, or xgboost. Supports leakage-safe feature selection, 
-             permutation importance, SHAP-based interpretability, and calibration 
-             methods (Platt or isotonic). Provides stability metrics across folds, 
-             embeddings (PCA/UMAP), ROC visualization, SHAP dependence plots, and tidy 
-             ranked-gene tables for downstream analysis.
+Description: Tools to harmonize bulk RNA-seq matrices, optionally apply batch correction,
+             and train cross-validated classification models using ranger, glmnet, or xgboost.
+             Supports leakage-safe feature selection, permutation importance, SHAP-based
+             interpretability, and calibration methods (Platt or isotonic). Provides stability
+             metrics across folds, embeddings (PCA/UMAP), ROC visualization, SHAP dependence
+             plots, and tidy ranked-gene tables for downstream analysis.
 License: MIT + file LICENSE
 URL: https://github.com/Abdulaziz-Albeshri/RFGeneRank
 BugReports: https://github.com/Abdulaziz-Albeshri/RFGeneRank/issues
