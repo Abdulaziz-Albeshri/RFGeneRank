@@ -1,10 +1,9 @@
 #' Batch-aware cross-validation with optional ComBat modes (incl. frozen ComBat)
 #'
 #' @description
-#' Orchestrates leakage-safe CV for RFGeneRank with three ComBat modes:
+#' Orchestrates leakage-safe CV for RFGeneRank with two ComBat modes:
 #' - "none":     no batch correction
-#' - "train":    frozen ComBat - fit on TRAIN folds only; apply TRAIN parameters to TEST
-#' - "regular":  ComBat on ALL samples before splitting (leaky; exploratory)
+#' - "train":    train-only batch correction with leakage-safe application to TEST
 #'
 #' Supports LOBO (leave-one-batch-out), Group K-Fold by batch, and standard K-Fold.
 #'
@@ -17,7 +16,7 @@
 #' @param covariates character vector of column names to *preserve* in ComBat (added to design)
 #' @param cv one of c("lobo","groupk","kfold")
 #' @param k integer; number of folds for "groupk" or "kfold"
-#' @param combat_mode one of c("none","train","regular")
+#' @param combat_mode one of c("none","train")
 #' @param rf_trees integer; number of trees for ranger
 #' @param seed integer; RNG seed
 #' @param verbose logical; emit progress messages
@@ -60,7 +59,7 @@ rfgr_crossval <- function(expr, metadata,
                           covariates  = NULL,
                           cv          = c("lobo","groupk","kfold"),
                           k           = 5,
-                          combat_mode = c("none","train","regular"),
+                          combat_mode = c("none","train"),
                           rf_trees    = 1000,
                           seed        = 1,
                           verbose     = TRUE) {
@@ -163,41 +162,26 @@ rfgr_crossval <- function(expr, metadata,
 
     mod_tr  <- stats::model.matrix(form, data = meta_tr)
     mod_te  <- stats::model.matrix(form, data = meta_te)
-    mod_all <- stats::model.matrix(form, data = metadata)
 
-    # --- Choose ComBat path ---
-    if (combat_mode == "regular") {
-      if (!requireNamespace("neuroCombat", quietly = TRUE)) {
-        stop("combat_mode = 'regular' requires 'neuroCombat'. Install it or use 'none'.")
-      }
-      cb <- neuroCombat::neuroCombat(
-        dat   = expr,
-        batch = metadata[[batch_col]],
-        mod   = mod_all
-      )
-      X_tr_h <- cb$dat.combat[, tr, drop = FALSE]
-      X_te_h <- cb$dat.combat[, te, drop = FALSE]
-
-    } else if (combat_mode == "train") {
-      # Frozen ComBat: fit on TRAIN, apply TRAIN estimates to TEST
-      fit <- rfgr_combat_fit_train(
-        X_tr    = X_tr,
-        batch_tr= meta_tr[[batch_col]],
-        mod_tr  = mod_tr
-      )
-      X_tr_h <- fit$X_tr_h
-      X_te_h <- rfgr_combat_apply_test(
-        X_te    = X_te,
-        batch_te= meta_te[[batch_col]],
-        mod_te  = mod_te,
-        estimates = fit$estimates
-      )
-
-    } else {
-      # "none": pass-through
-      X_tr_h <- X_tr
-      X_te_h <- X_te
-    }
+if (combat_mode == "train") {
+  # Train-only fit + leakage-safe apply (implemented in combat_helpers.R)
+  fit <- rfgr_combat_fit_train(
+    X_tr     = X_tr,
+    batch_tr = meta_tr[[batch_col]],
+    mod_tr   = mod_tr
+  )
+  X_tr_h <- fit$X_tr_h
+  X_te_h <- rfgr_combat_apply_test(
+    X_te      = X_te,
+    batch_te  = meta_te[[batch_col]],
+    mod_te    = mod_te,
+    estimates = fit$estimates
+  )
+} else {
+  # "none": pass-through
+  X_tr_h <- X_tr
+  X_te_h <- X_te
+}
 
     # --- Train RF and evaluate AUC ---
     y_tr <- factor(meta_tr[[label_col]])
