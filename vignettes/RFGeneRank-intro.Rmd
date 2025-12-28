@@ -1,20 +1,192 @@
 ---
-title: "RFGeneRank: Quick Start"
-package: RFGeneRank
-output:
-  BiocStyle::html_document:
-    toc: true
-    number_sections: true
+title: "RFGeneRank: Cross-validated, stable predictive gene ranking for transcriptomics"
+author: "Abdulaziz Albeshri"
+date: "`r Sys.Date()`"
+output: BiocStyle::html_document
 vignette: >
-  %\VignetteIndexEntry{RFGeneRank: Quick Start}
+  %\VignetteIndexEntry{RFGeneRank}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(collapse=TRUE, comment="#>", message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
 
-## Session information
+# Abstract
 
-```{r session-info, echo=FALSE}
+RFGeneRank is a Bioconductor package that provides a leakage-aware, machine-learning workflow for gene ranking and 
+classification using bulk RNA-seq–derived expression matrices. The package emphasizes reproducible evaluation with 
+cross-validation and out-of-fold (OOF) preprocessing, and provides interpretable gene importance outputs for downstream 
+biological interpretation.
+
+# Introduction and Motivation
+
+High-throughput transcriptomic studies are often collected across different cohorts, sequencing runs, or laboratories. 
+When datasets are integrated, batch effects and confounding can inflate predictive performance if preprocessing is performed 
+outside cross-validation (information leakage). RFGeneRank addresses this by providing a fold-safe workflow for gene ranking 
+and classification that integrates clean inputs, batch-aware options, and convenient reporting.
+
+# Relation to existing Bioconductor packages
+
+Bioconductor provides well-established methodologies for differential expression analysis and batch effect correction. 
+RFGeneRank is not intended to replace these methodologies. Instead, it is designed to complement existing analytical workflows 
+by adding a machine-learning–based gene ranking layer, with leakage-aware evaluation and diagnostic capabilities, implemented 
+in a Bioconductor-compatible framework using standard data containers.
+
+# Installation
+
+```{r, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("RFGeneRank")
+```
+
+# A small runnable example
+
+This vignette demonstrates the core protocol used in RFGeneRank:
+
+1. Generate a small transcriptomics-like dataset (genes × samples).
+2. Run `prepare_data()`.
+3. Run `rank_genes()`.
+4. Run a small set of downstream functions and basic plots.
+
+```{r}
+suppressPackageStartupMessages({
+  library(RFGeneRank)
+  library(SummarizedExperiment)
+  library(S4Vectors)
+})
+
+set.seed(42)
+
+n_genes <- 300
+n_samples <- 60
+
+genes   <- paste0("Gene", seq_len(n_genes))
+samples <- paste0("Sample", seq_len(n_samples))
+
+# Sample metadata (rows must match sample names)
+meta_df <- data.frame(
+  state = factor(rep(c("CTRL","CASE"), each = n_samples/2), levels = c("CTRL","CASE")),
+  batch = factor(rep(c("B1","B2"), length.out = n_samples)),
+  sex   = factor(rep(c("M","F"), length.out = n_samples)),
+  age   = round(stats::runif(n_samples, 25, 65)),
+  stringsAsFactors = FALSE,
+  check.names = TRUE
+)
+
+# Transcriptomics-like expression: strictly positive values (log-normal)
+expr <- matrix(
+  exp(rnorm(n_genes * n_samples, mean = 2.5, sd = 0.6)),
+  nrow = n_genes, ncol = n_samples,
+  dimnames = list(genes, samples)
+)
+
+# Inject signal in CASE for a subset of genes
+signal_genes <- genes[1:25]
+case_cols <- meta_df$state == "CASE"
+expr[signal_genes, case_cols] <- expr[signal_genes, case_cols] * 1.8
+
+# Critical alignment: metadata rownames must match expression colnames
+rownames(meta_df) <- colnames(expr)
+stopifnot(identical(colnames(expr), rownames(meta_df)))
+
+# Build SummarizedExperiment
+se <- SummarizedExperiment(
+  assays  = list(expr = expr),
+  colData = DataFrame(meta_df)
+)
+
+se
+```
+
+# Step 1: prepare_data()
+
+```{r}
+# Detect whether the matrix is count-like (integer); our simulated data are continuous.
+is_integerish <- function(x) all(abs(x - round(x)) < 1e-8, na.rm = TRUE)
+counts_flag <- is_integerish(expr)
+
+se_prep <- prepare_data(
+  mats   = list(SummarizedExperiment::assay(se, "expr")),
+  metas  = list(meta_df),   # use data.frame for robustness in vignettes
+  label_col  = "state",
+  batch_col  = "batch",
+  log1p      = counts_flag,
+  batch_method = "combat",
+  batch_correction_scope = "global"
+)
+
+se_prep
+```
+
+# Step 2: rank_genes()
+
+```{r}
+cw <- c(CTRL = 1, CASE = 2)
+
+fit <- rank_genes(
+  se_prep,
+  label_col = "state",
+  cv = "kfold", k = 3,
+  n_top = 100,
+  trees = 300,
+  fold_batch_correction = FALSE,
+  batch_col = "batch",
+  class_weights = cw,
+  auto_confounds = FALSE,
+  seed = 42
+)
+
+fit
+```
+
+# Step 3: downstream utilities
+
+## Top genes
+
+```{r}
+top_genes(fit, n = 10)
+```
+
+## Signed importance (directionality)
+
+```{r}
+tab_signed <- sign_importance(
+  fit, se_prep,
+  y = SummarizedExperiment::colData(se_prep)[["state"]],
+  method = "mean"
+)
+
+head(tab_signed, 10)
+```
+
+## Basic plots
+
+```{r}
+plot_importance(
+  fit,
+  top = 20,
+  map_to_symbol = FALSE
+)
+
+plot_roc(fit)
+
+plot_sign_importance(
+  fit,
+  tab = tab_signed,
+  top = 20
+)
+```
+
+# Session information
+
+```{r}
 sessionInfo()
+```
