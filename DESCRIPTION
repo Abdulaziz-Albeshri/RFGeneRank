@@ -47,7 +47,6 @@ Imports:
     Matrix,
     glmnet,
     xgboost,
-    neuroCombat,
     patchwork
 Suggests:
     GEOquery,
