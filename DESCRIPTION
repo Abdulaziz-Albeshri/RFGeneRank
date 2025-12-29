@@ -68,7 +68,7 @@ VignetteBuilder:
 biocViews: Transcriptomics, RNASeq, GeneExpression, FeatureExtraction,
     Classification, Visualization, Software, StatisticalMethod, Alignment
 Encoding: UTF-8
-LazyData: true
+LazyData: false
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Collate:
