@@ -8,6 +8,7 @@
 * Refactored selected loops using vectorized/*apply approaches.
 * Improved message/stop construction.
 * Updated documentation and vignette (runnable examples, chunk labels).
+* Minor update (trigger rebuild)
 
 # RFGeneRank 0.99.1
 
