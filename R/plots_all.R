@@ -2,8 +2,6 @@
 # Unified plotting API for RFGeneRank.
 # All public plotting functions live here to simplify maintenance & docs.
 
-# small helper (internal)
-`%||%` <- function(a, b) if (!is.null(a)) a else b
 
 # --- helpers used by plot_shap_dependence ------------------------------------
 .make_age_numeric <- function(cd, age_col) { ... }
@@ -35,6 +33,7 @@
 #' @return A ggplot object.
 #' @export
 #' @importFrom ggplot2 ggplot aes geom_point labs theme_classic coord_flip scale_x_discrete
+#' @importFrom stats predict
 #' @examples
 #' # Toy expression matrix: genes x samples
 #' expr <- matrix(
@@ -75,8 +74,9 @@ plot_importance <- function(fit, top = 30,
     stop("ggplot2 is required for plotting.", call. = FALSE)
 
   # top rows from importance table
-  df <- fit@imp[order(fit@imp$importance, decreasing = TRUE), , drop = FALSE]
-  df <- head(df, top)
+  imp0 <- .rfgr_imp(fit)
+  df <- imp0[order(imp0$importance, decreasing = TRUE), , drop = FALSE]
+  df <- head(df, top) # keep only the top features for plotting to avoid overcrowding the figure
   df$gene <- factor(df$gene, levels = rev(df$gene))
 
   p <- ggplot2::ggplot(df, ggplot2::aes(x = gene, y = importance)) +
@@ -109,7 +109,7 @@ plot_importance <- function(fit, top = 30,
 #' Signed feature importance (directional effect)
 #'
 #' Visualizes direction-aware importances produced by \code{sign_importance()}.
-#' If \code{tab} is NULL, the function will try to read \code{fit@imp} and
+#' If \code{tab} is NULL, the function will try to read the stored importance table and
 #' require a \code{signed_importance} column to be present there.
 #'
 #' @param fit GeneRankFit (optional if \code{tab} is supplied)
@@ -135,16 +135,6 @@ plot_importance <- function(fit, top = 30,
 #'
 #' head(signed_imp)
 #'
-#' \donttest{
-#' # In practice, plot_sign_importance() is used on a GeneRankFit object
-#' # after computing signed importances, for example:
-#' #
-#' #   fit <- gene_rank(se, genes = rownames(se), ...)
-#' #   sig_imp <- sign_importance(fit, X = expr_matrix, y = outcome)
-#' #   plot_sign_importance(fit, top_n = 20)
-#' #
-#' # where the sign and magnitude of each gene's contribution are visualized.
-#' }
 plot_sign_importance <- function(fit = NULL, tab = NULL, top = 30,
                                  map_to_symbol = FALSE,
                                  from = "ENTREZID", to = "SYMBOL",
@@ -155,20 +145,26 @@ plot_sign_importance <- function(fit = NULL, tab = NULL, top = 30,
   # Resolve the input table
   if (is.null(tab)) {
     if (is.null(fit))
-      stop("Provide either `tab` (from sign_importance) or `fit` with signed_importance in fit@imp.", call. = FALSE)
-    if (is.null(fit@imp) || !"signed_importance" %in% colnames(fit@imp))
-      stop("`fit@imp` lacks `signed_importance`. Call sign_importance() first or pass `tab=`.", call. = FALSE)
-    tab <- fit@imp
-  }
+      stop("Provide either `tab` (from sign_importance) or `fit` with stored signed importance.", call. = FALSE)
+
+      imp0 <- .rfgr_imp(fit)
+      if (is.null(imp0) || !"signed_importance" %in% colnames(imp0)) {
+      stop("Stored importance table lacks `signed_importance`. Call sign_importance() first or pass `tab=`.", call. = FALSE)
+      }
+      tab <- imp0
+      }
 
   req_cols <- c("gene", "importance", "direction", "signed_importance")
-  miss <- setdiff(req_cols, colnames(tab))
-  if (length(miss))
-    stop("`tab` is missing required columns: ", paste(miss, collapse = ", "), call. = FALSE)
+miss <- setdiff(req_cols, colnames(tab))
+if (length(miss)) {
+  details <- paste(miss, collapse = ", ")
+  msg <- paste0("`tab` is missing required columns: ", details)
+  stop(msg, call. = FALSE)
+}
 
   df <- tab[, req_cols, drop = FALSE]
   df <- df[order(abs(df$signed_importance), decreasing = TRUE), , drop = FALSE]
-  df <- head(df, top)
+  df <- head(df, top) # keep only the top features for plotting to avoid overcrowding the figure
 
   df$gene <- factor(df$gene, levels = rev(df$gene))
   df$direction <- as.character(df$direction)
@@ -217,7 +213,7 @@ plot_sign_importance <- function(fit = NULL, tab = NULL, top = 30,
 #' @param engine UMAP engine, "umap" or "uwot" (used when type="umap")
 #' @param neighbors,min_dist,metric UMAP parameters
 #' @param zscore Logical; z-score samples x genes matrix before embedding (default TRUE)
-#' @param seed RNG seed for UMAP reproducibility (default \code{fit@params$seed})
+#' @param seed RNG seed for UMAP reproducibility (default uses stored pipeline seed if available).
 #' @param point_size numeric
 #' @param show_legend logical
 #' @param palette optional named vector of colors (names must match levels)
@@ -225,12 +221,12 @@ plot_sign_importance <- function(fit = NULL, tab = NULL, top = 30,
 #' @export
 #' @importFrom SummarizedExperiment assay colData assayNames
 #' @importFrom ggplot2 ggplot aes geom_point labs theme_classic scale_color_manual
-#' @importFrom stats prcomp
+#' @importFrom stats prcomp rnorm
 #' @examples
 #' # For reproducibility, specify a fixed seed (e.g., set.seed(1)) before running this example.
 #'
 #' # Toy expression: 15 genes × 8 samples
-#' expr <- matrix(stats::rnorm(15 * 8), nrow = 15)
+#' expr <- matrix(rnorm(15 * 8), nrow = 15)
 #' rownames(expr) <- paste0("gene", 1:15)
 #' colnames(expr) <- paste0("sample", 1:8)
 #'
@@ -244,23 +240,11 @@ plot_sign_importance <- function(fit = NULL, tab = NULL, top = 30,
 #'
 #' se
 #'
-#' \donttest{
-#' # In practice, plot_embed_expr() uses the expression assay directly,
-#' # for example:
-#' #
-#' #   plot_embed_expr(
-#' #     se,
-#' #     label_col = "label",
-#' #     method    = "PCA"
-#' #   )
-#' #
-#' # to visualize sample-level embeddings coloured by the outcome.
-#' }
 plot_embed_expr <- function(fit, se, n_top = 100,
                             type = c("umap","pca"),
                             engine = c("umap","uwot"),
                             neighbors = 15, min_dist = 0.1, metric = "euclidean",
-                            zscore = TRUE, seed = fit@params$seed,
+                            zscore = TRUE, seed = NULL,
                             point_size = 2, show_legend = TRUE, palette = NULL) {
   type   <- match.arg(type)
   engine <- match.arg(engine)
@@ -272,13 +256,19 @@ plot_embed_expr <- function(fit, se, n_top = 100,
 
   X <- SummarizedExperiment::assay(se, "expr")
   md <- as.data.frame(SummarizedExperiment::colData(se))
-  y  <- factor(md[[fit@params$label_col]])
+  pars <- .rfgr_params(fit)
+
+  if (is.null(seed)) seed <- pars$seed %||% 1
+
+  y <- factor(md[[pars$label_col]])
   names(y) <- rownames(md)
 
-  feats <- head(fit@imp$gene, n_top)
+  imp0 <- .rfgr_imp(fit)
+  feats <- head(imp0$gene, n_top) # use only the top-ranked genes for the embedding plot
   feats <- intersect(feats, rownames(X))
   if (length(feats) < 2L)
     stop("Fewer than 2 overlapping top genes for embedding.", call. = FALSE)
+
 
   # samples x features
   M <- t(as.matrix(X[feats, , drop = FALSE]))
@@ -292,7 +282,7 @@ plot_embed_expr <- function(fit, se, n_top = 100,
     if (sum(keep) < 2L) stop("Too few variable genes for PCA.", call. = FALSE)
     Mp <- M[, keep, drop = FALSE]
 
-    pc   <- stats::prcomp(Mp, center = TRUE, scale. = FALSE)
+    pc   <- prcomp(Mp, center = TRUE, scale. = FALSE)
     ve   <- (pc$sdev^2) / sum(pc$sdev^2)
     lab1 <- sprintf("PC1 (%.1f%%)", 100 * ve[1])
     lab2 <- sprintf("PC2 (%.1f%%)", 100 * ve[2])
@@ -365,37 +355,27 @@ plot_embed_expr <- function(fit, se, n_top = 100,
 #' @return A ggplot object.
 #' @export
 #' @importFrom ggplot2 ggplot aes geom_point labs theme_classic scale_color_manual
-#' @importFrom stats prcomp
+#' @importFrom stats prcomp pt p.adjust
 #' @examples
 #' # For reproducibility, specify a fixed seed (e.g., set.seed(1)) before running this example.
 #'
 #' # Toy 2D embedding for 10 samples
 #' embed_df <- data.frame(
 #'   sample = paste0("sample", 1:10),
-#'   dim1   = stats::rnorm(10),
-#'   dim2   = stats::rnorm(10),
+#'   dim1   = rnorm(10),
+#'   dim2   = rnorm(10),
 #'   label  = factor(rep(c("A", "B"), each = 5))
 #' )
 #'
 #' head(embed_df)
 #'
-#' \donttest{
-#' # In practice, plot_embed() is used on a GeneRankFit object
-#' # produced by the RFGeneRank workflow, for example:
-#' #
-#' #   fit <- gene_rank(se, genes = rownames(se), ...)
-#' #   plot_embed(fit, palette = c("A" = "#1f77b4", "B" = "#ff7f0e"))
-#' #
-#' # where the embedding (e.g. PCA / UMAP) is stored inside 'fit'
-#' # and coloured by the outcome or another covariate.
-#' }
 plot_embed <- function(fit,
                        type = c("pca","umap"),
                        engine = c("umap","uwot"),
-                       neighbors = fit@params$umap$neighbors %||% 15,
-                       min_dist = fit@params$umap$min_dist %||% 0.1,
-                       metric   = fit@params$umap$metric   %||% "cosine",
-                       seed     = fit@params$seed %||% 1,
+                       neighbors = NULL,
+                       min_dist = NULL,
+                       metric   = NULL,
+                       seed     = NULL,
                        point_size = 2, show_legend = TRUE, palette = NULL) {
   type   <- match.arg(type)
   engine <- match.arg(engine)
@@ -403,16 +383,25 @@ plot_embed <- function(fit,
   if (!requireNamespace("ggplot2", quietly = TRUE))
     stop("ggplot2 is required for plotting.", call. = FALSE)
 
-  prob <- fit@oof$prob
+  pars <- .rfgr_params(fit)
+
+  if (is.null(neighbors)) neighbors <- pars$umap$neighbors %||% 15
+  if (is.null(min_dist))  min_dist  <- pars$umap$min_dist %||% 0.1
+  if (is.null(metric))    metric    <- pars$umap$metric   %||% "cosine"
+  if (is.null(seed))      seed      <- pars$seed %||% 1
+
+  oof0 <- .rfgr_oof(fit)
+  prob <- oof0$prob
   if (is.null(prob) || !is.matrix(prob))
-    stop("fit@oof$prob is missing; run rank_genes() first.", call. = FALSE)
+    stop("OOF probabilities are missing; run rank_genes() first.", call. = FALSE)
 
   # samples x classes matrix
   M <- prob
-  y <- fit@oof$y
+  oof0 <- .rfgr_oof(fit)
+  y <- oof0$y
 
   if (type == "pca") {
-    pc   <- stats::prcomp(M, center = TRUE, scale. = TRUE)
+    pc   <- prcomp(M, center = TRUE, scale. = TRUE)
     ve   <- (pc$sdev^2) / sum(pc$sdev^2)
     lab1 <- sprintf("PC1 (%.1f%%)", 100 * ve[1])
     lab2 <- sprintf("PC2 (%.1f%%)", 100 * ve[2])
@@ -498,8 +487,8 @@ plot_embed <- function(fit,
     n      <- SHAP[, "n"];  mean_phi <- SHAP[, "m"];  sd_phi <- SHAP[, "sd"]
     se_phi <- sd_phi / sqrt(pmax(n, 1))
     t_stat <- ifelse(se_phi > 0 & n >= 2, mean_phi / se_phi, NA_real_)
-    p_val  <- ifelse(is.finite(t_stat), 2 * stats::pt(-abs(t_stat), df = n - 1), NA_real_)
-    fdr    <- stats::p.adjust(p_val, "BH")
+    p_val  <- ifelse(is.finite(t_stat), 2 * pt(-abs(t_stat), df = n - 1), NA_real_)
+    fdr    <- p.adjust(p_val, "BH")
     abs_t  <- abs(t_stat); abs_mean <- abs(mean_phi)
     SHAP   <- NULL
   }))
@@ -543,7 +532,7 @@ plot_embed <- function(fit,
 # ---------- main: SHAP dependence scatter for one gene (cached-first, robust) ----------
 #' SHAP dependence scatter for one gene (cached-first, robust, fast)
 #'
-#' @param fit GeneRankFit (must have fit@oof$prob and labels in colData(se)$state).
+#' @param fit GeneRankFit containing out-of-fold predictions and labels.
 #' @param se  SummarizedExperiment with assay "expr".
 #' @param gene Character gene ID present in assay(se,"expr").
 #' @param x    Covariate name in colData(se) for x-axis (default "age").
@@ -619,7 +608,8 @@ plot_shap_dependence <- function(fit, se,
   stopifnot("expr" %in% SummarizedExperiment::assayNames(se))
 
   ## ---- align to OOF order ---------------------------------------------------
-  sids <- rownames(fit@oof$prob)
+  oof0 <- .rfgr_oof(fit)
+  sids <- rownames(oof0$prob)
   cd   <- as.data.frame(SummarizedExperiment::colData(se))[sids, , drop = FALSE]
   yfac <- droplevels(as.factor(cd$state))
   if (is.null(pos_label)) pos_label <- levels(yfac)[2]
@@ -649,11 +639,11 @@ plot_shap_dependence <- function(fit, se,
     pred_fun <- function(object, newdata) {
       nd <- as.data.frame(newdata)
 
-      pr <- tryCatch(stats::predict(object, newdata = nd, type = "prob"),
+      pr <- tryCatch(predict(object, newdata = nd, type = "prob"),
                      error = function(e) NULL)
       if (!is.null(pr)) return(as.numeric(pr[, pos_label, drop = TRUE]))
 
-      pr <- tryCatch(stats::predict(object, newdata = nd, type = "response"),
+      pr <- tryCatch(predict(object, newdata = nd, type = "response"),
                      error = function(e) NULL)
       if (!is.null(pr)) {
         if (is.matrix(pr) || is.data.frame(pr)) return(as.numeric(pr[, pos_label, drop = TRUE]))
@@ -943,18 +933,6 @@ plot_shap_dependence <- function(fit, se,
 #' # Inspect inputs
 #' head(X)
 #'
-#' \donttest{
-#' # In practice, shap_train_ranger() computes a SHAP matrix using a single
-#' # ranger model. A typical call is:
-#' #
-#' #   shap_obj <- shap_train_ranger(
-#' #     X    = X,
-#' #     y    = y,
-#' #     nsim = 128
-#' #   )
-#' #
-#' # where 'shap_obj' contains the SHAP values for each feature.
-#' }
 shap_train_ranger <- function(se, label_col = "state", genes,
                               class_weights = NULL,
                               num.trees = 500, seed = 1L, nsim = 64,
@@ -1014,7 +992,7 @@ shap_train_ranger <- function(se, label_col = "state", genes,
 }
 
 #' ROC curve from OOF probabilities (single model)
-#' @param fit GeneRankFit with \code{fit@oof$prob} and \code{fit@oof$y}
+#' @param fit GeneRankFit with stored out-of-fold predictions and labels.
 #' @return A \code{ggplot2} object containing the ROC curve derived from
 #' @export
 #' @importFrom pROC roc auc coords
@@ -1044,12 +1022,14 @@ plot_roc <- function(fit) {
   if (!requireNamespace("ggplot2", quietly = TRUE))
     stop("ggplot2 is required for plotting.", call. = FALSE)
 
-  prob <- fit@oof$prob
-  y    <- droplevels(as.factor(fit@oof$y))
+  oof0 <- .rfgr_oof(fit)
+  prob <- oof0$prob
+  oof0 <- .rfgr_oof(fit)
+  y <- droplevels(as.factor(oof0$y))
   stopifnot(is.matrix(prob), nrow(prob) == length(y))
 
   # Positive class = last level
-  pos <- tail(levels(y), 1)
+  pos <- tail(levels(y), 1) # use the last factor level as the positive class when no explicit positive label is supplied
   p   <- prob[, pos]
 
   roc <- pROC::roc(response = y, predictor = p,
@@ -1256,25 +1236,25 @@ plot_confusion_heatmap <- function(cm, mode = c("counts","rowpct")) {
 #'   trees     = 100
 #' )
 #'
-#' # For this example, ensure fit@imp has signed_importance information
+#' # For this example, ensure the stored importance table has signed_importance information
 #' # required by plot_sign_importance().
-#' if (is.null(fit@imp)) {
-#'   ng <- nrow(expr)
-#'   fit@imp <- data.frame(
-#'     gene             = rownames(expr),
-#'     importance       = seq_len(ng),
-#'     direction        = rep(1L, ng),
-#'     signed_importance = seq_len(ng),
+#' imp0 <- imp(fit)
+#' if (is.null(imp0)) {
+#'   imp0 <- data.frame(
+#'     gene = character(),
+#'     importance = numeric(),
+#'     direction = integer(),
+#'     signed_importance = numeric(),
 #'     stringsAsFactors = FALSE
 #'   )
-#' } else {
-#'   if (!"direction" %in% colnames(fit@imp)) {
-#'     fit@imp$direction <- 1L
-#'   }
-#'   if (!"signed_importance" %in% colnames(fit@imp)) {
-#'     fit@imp$signed_importance <- fit@imp$importance * fit@imp$direction
-#'   }
 #' }
+#' if (!"direction" %in% colnames(imp0)) {
+#'   imp0$direction <- 1L
+#' }
+#' if (!"signed_importance" %in% colnames(imp0)) {
+#'   imp0$signed_importance <- imp0$importance * imp0$direction
+#' }
+#' imp(fit) <- imp0
 #'
 #' # Generate a suite of diagnostic plots (returned as a list of ggplot objects)
 #' plots <- rfgr_plot_suite(fit, se)
@@ -1301,15 +1281,20 @@ rfgr_plot_suite <- function(fit, se, val = NULL, outdir = NULL, top = 30, shap_g
   p_dec <- plot_embed(fit, type = "pca")
   plots$decision_pca <- p_dec
 
-  # 4) multi-ROC from validate_genes() (if provided) + confusion heatmaps
-  if (!is.null(val)) {
-    fits <- setNames(lapply(val$summary$method, function(m) val[[m]]), val$summary$method)
-    plots$roc_multi <- plot_roc_multi(fits, title = "ROC (OOF, guardrailed)")
-    for (m in names(fits)) {
-      plots[[paste0("cm_", m, "_counts")]]  <- plot_confusion_heatmap(fits[[m]]$conf_mat, "counts")
-      plots[[paste0("cm_", m, "_rowpct")]]  <- plot_confusion_heatmap(fits[[m]]$conf_mat, "rowpct")
-    }
-  }
+ # 4) multi-ROC from validate_genes() (if provided) + confusion heatmaps
+if (!is.null(val)) {
+  fits <- setNames(lapply(val$summary$method, function(m) val[[m]]), val$summary$method)
+  plots$roc_multi <- plot_roc_multi(fits, title = "ROC (OOF, guardrailed)")
+
+  cm_plots <- do.call(c, lapply(names(fits), function(m) {
+    out <- list()
+    out[[paste0("cm_", m, "_counts")]] <- plot_confusion_heatmap(fits[[m]]$conf_mat, "counts")
+    out[[paste0("cm_", m, "_rowpct")]] <- plot_confusion_heatmap(fits[[m]]$conf_mat, "rowpct")
+    out
+  }))
+
+  plots <- c(plots, cm_plots)
+}
 
   # 5) optional SHAP dependence
   if (!is.null(shap_gene)) plots$shap <- plot_shap_dependence(fit, se, shap_gene)
@@ -1327,7 +1312,9 @@ rfgr_plot_suite <- function(fit, se, val = NULL, outdir = NULL, top = 30, shap_g
     save_plot(p_dec, "decision_pca")
     if (!is.null(val)) {
       save_plot(plots$roc_multi, "roc_multi", w=7, h=5)
-      for (nm in names(plots)) if (startsWith(nm, "cm_")) save_plot(plots[[nm]], nm, w=5, h=4)
+      invisible(lapply(names(plots), function(nm) {
+  if (startsWith(nm, "cm_")) save_plot(plots[[nm]], nm, w = 5, h = 4)
+}))
     }
     if ("shap" %in% names(plots)) save_plot(plots$shap, "shap_dependence", w=7, h=4.5)
   }

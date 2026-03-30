@@ -1,8 +1,8 @@
 #' Covariate dependence of gene contributions (SHAP/proxy; "expr" assay)
 #'
-#' @param fit            Trained object with OOF slots: fit@oof$prob (n x k), fit@oof$y (factor).
+#' @param fit            Trained object containing out-of-fold predictions (n x k) and labels.
 #'                       For S4 wrappers (e.g., GeneRankFit), the finalized learner should be in
-#'                       fit@final_model and the training features in fit@features. If missing,
+#'                       A final fitted model and the training feature names may also be present.
 #'                       this function will train a temporary full-data model on-the-fly (not saved).
 #' @param se             SummarizedExperiment with assay "expr" (genes x samples).
 #' @param covariates     Character vector of covariate names in colData(se), e.g. c("sex","age").
@@ -73,6 +73,11 @@ factor_dependence <- function(
   pos_label = NULL,   # kept for compatibility
   positive = NULL     # new optional override
 ) {
+  oof0 <- .rfgr_oof(fit)
+  imp0 <- .rfgr_imp(fit)
+  pars <- .rfgr_params(fit)
+  mdl0 <- .rfgr_final_model(fit)
+  fts0 <- .rfgr_features(fit)
   method <- match.arg(method)
   gene_selection <- match.arg(gene_selection)
   stopifnot(length(covariates) >= 1)
@@ -84,17 +89,17 @@ factor_dependence <- function(
   expr_all <- SummarizedExperiment::assay(se, "expr")  # genes x samples
   cd_all   <- as.data.frame(SummarizedExperiment::colData(se))
 
-  sids <- rownames(fit@oof$prob)
-  if (is.null(sids)) stop("fit@oof$prob must have rownames = sample IDs.")
+  sids <- rownames(oof0$prob)
+  if (is.null(sids)) stop("OOF probabilities must have rownames = sample IDs.")
   if (!all(sids %in% colnames(expr_all))) {
     miss <- setdiff(sids, colnames(expr_all))
-    stop("Sample ID mismatch: some rownames(fit@oof$prob) not in assay 'expr'. Examples: ",
-         paste(utils::head(miss, 5), collapse = ", "))
+    stop("Sample ID mismatch: some OOF sample IDs not in assay 'expr'. Examples: ",
+         paste(utils::head(miss, 5), collapse = ", ")) # show only the first few missing items to keep the diagnostic message readable
   }
   if (!all(sids %in% rownames(cd_all))) {
     miss <- setdiff(sids, rownames(cd_all))
-    stop("Sample ID mismatch: some rownames(fit@oof$prob) not in colData(se). Examples: ",
-         paste(utils::head(miss, 5), collapse = ", "))
+    stop("Sample ID mismatch: some OOF sample IDs not in colData(se). Examples: ",
+         paste(utils::head(miss, 5), collapse = ", ")) # show only the first few missing items to keep the diagnostic message readable
   }
 
   expr <- expr_all[, sids, drop = FALSE]  # # genes x samples (aligned)
@@ -131,11 +136,11 @@ factor_dependence <- function(
   if (is.character(ngenes) && toupper(ngenes) == "ALL" || is.null(ngenes)) {
     genes <- rownames(Xg_full)
   } else if (gene_selection == "importance") {
-    if (is.null(fit@imp) || !all(c("gene","importance") %in% names(fit@imp))) {
-      stop("`gene_selection='importance'` requires fit@imp with columns 'gene' and 'importance'.")
+    if (is.null(imp0) || !all(c("gene","importance") %in% names(imp0))) {
+    stop("`gene_selection='importance'` requires an importance table with columns 'gene' and 'importance'.")
     }
-    imp_df <- fit@imp[order(-fit@imp$importance), c("gene","importance"), drop = FALSE]
-    genes  <- head(imp_df$gene, ngenes)
+    imp_df <- imp0[order(-imp0$importance), c("gene","importance"), drop = FALSE]
+    genes  <- head(imp_df$gene, ngenes) # select the top-ranked genes for downstream dependence analysis
     genes  <- intersect(genes, rownames(Xg_full))
     if (!length(genes)) stop("No overlap between top-importance genes and 'expr' rownames.")
   } else { # variance
@@ -187,17 +192,29 @@ factor_dependence <- function(
       pred_wrapper <- function(object, newdata) pf_local(newdata)
     } else {
       # pull finalized learner + training features; if missing, build ephemeral model now
-      mdl   <- try(fit@final_model, silent = TRUE); if (inherits(mdl, "try-error")) mdl <- fit$final_model
-      feats <- try(fit@features,     silent = TRUE); if (inherits(feats,"try-error")) feats <- fit$features
+      mdl <- try(mdl0, silent = TRUE)
+if (inherits(mdl, "try-error") || is.null(mdl)) {
+  if (is.list(fit) && !is.null(fit$final_model)) mdl <- fit$final_model
+}
 
+feats <- try(fts0, silent = TRUE)
+if (inherits(feats, "try-error") || is.null(feats)) {
+  if (is.list(fit) && !is.null(fit$features)) feats <- fit$features
+}
       if (is.null(mdl)) {
         # ---- build a temporary full-data model on the selected genes (not saved back) ----
         df_tr  <- as.data.frame(X_eval, check.names = FALSE)  # samples x genes
-        trees  <- try(fit@params$trees,      silent = TRUE); if (inherits(trees,"try-error") || is.null(trees))  trees  <- 1000L
-        imp    <- try(fit@params$importance, silent = TRUE); if (inherits(imp,  "try-error") || is.null(imp))    imp    <- "permutation"
-        cw     <- try(fit@params$class_weights, silent = TRUE); if (inherits(cw,"try-error")) cw <- NULL
-        seed0  <- try(fit@params$seed,       silent = TRUE); if (inherits(seed0,"try-error") || is.null(seed0))  seed0  <- seed
+        trees <- try(pars$trees, silent = TRUE)
+        if (inherits(trees, "try-error") || is.null(trees)) trees <- 1000L
 
+        imp <- try(pars$importance, silent = TRUE)
+        if (inherits(imp, "try-error") || is.null(imp)) imp <- "permutation"
+
+        cw <- try(pars$class_weights, silent = TRUE)
+        if (inherits(cw, "try-error")) cw <- NULL
+
+        seed0 <- try(pars$seed, silent = TRUE)
+        if (inherits(seed0, "try-error") || is.null(seed0)) seed0 <- seed
         mdl <- ranger::ranger(
           x = df_tr, y = y,
           num.trees     = trees,
@@ -214,54 +231,72 @@ factor_dependence <- function(
       }
 
       # map "COVID-19" -> "COVID.19" if needed
-      pick_pos_col <- function(P, want) {
-        cn <- colnames(P)
-        if (is.null(cn)) stop("Model returned probs without column names.")
-        if (want %in% cn) return(want)
-        mn <- make.names(cn)
-        if (want %in% mn) return(cn[match(want, mn)])
-        stop("Positive label '", want, "' not found in predicted columns: ",
-             paste(cn, collapse=", "))
-      }
+     pick_pos_col <- function(P, want) {
+  cn <- colnames(P)
+  if (is.null(cn)) stop("Model returned probs without column names.")
+  if (want %in% cn) return(want)
 
-      poslab <- pos
-      pred_wrapper <- function(object, newdata) {
-        D <- as.data.frame(newdata)
-        miss <- setdiff(feats, colnames(D))
-        if (length(miss)) {
-          stop("newdata is missing ", length(miss), " trained features. Examples: ",
-               paste(utils::head(miss, 8), collapse = ", "))
-        }
-        D <- D[, feats, drop = FALSE]
+  mn <- make.names(cn)
+  if (want %in% mn) return(cn[match(want, mn)])
 
-        if (inherits(mdl, "ranger")) {
-          pr <- predict(mdl, data = D)
-          P  <- pr$predictions
-          if (is.null(P)) stop("Underlying ranger not probability-enabled; set probability=TRUE.")
-          poscol <- pick_pos_col(P, poslab)
-          return(as.numeric(P[, poscol, drop = TRUE]))
-        }
-        if (inherits(mdl, "randomForest")) {
-          P <- predict(mdl, D, type = "prob")
-          poscol <- pick_pos_col(P, poslab)
-          return(as.numeric(P[, poscol, drop = TRUE]))
-        }
-        if (inherits(mdl, "train")) { # caret
-          P <- predict(mdl, D, type = "prob")
-          P <- as.data.frame(P)
-          if (!(poslab %in% colnames(P))) {
-            mn <- make.names(colnames(P))
-            if (poslab %in% mn) poslab <- colnames(P)[match(poslab, mn)]
-          }
-          return(as.numeric(P[[poslab]]))
-        }
-        if (inherits(mdl, "glm")) {   # binomial
-          P <- stats::predict(mdl, newdata = D, type = "response")
-          return(as.numeric(P))
-        }
-        stop("Unsupported final_model class: ", paste(class(mdl), collapse = ", "))
-      }
+  details <- paste(cn, collapse = ", ")
+  msg <- paste0("Positive label '", want, "' not found in predicted columns: ", details)
+  stop(msg)
+}
+
+poslab <- pos
+
+pred_wrapper <- function(object, newdata) {
+  D <- as.data.frame(newdata)
+  miss <- setdiff(feats, colnames(D))
+
+  if (length(miss)) {
+    details <- paste(utils::head(miss, 8), collapse = ", ") # include only a short preview of missing entries in the error details
+    msg <- paste0(
+      "newdata is missing ",
+      length(miss),
+      " trained features. Examples: ",
+      details
+    )
+    stop(msg)
+  }
+
+  D <- D[, feats, drop = FALSE]
+
+  if (inherits(mdl, "ranger")) {
+    pr <- predict(mdl, data = D)
+    P  <- pr$predictions
+    if (is.null(P)) stop("Underlying ranger not probability-enabled; set probability=TRUE.")
+    poscol <- pick_pos_col(P, poslab)
+    return(as.numeric(P[, poscol, drop = TRUE]))
+  }
+
+  if (inherits(mdl, "randomForest")) {
+    P <- predict(mdl, D, type = "prob")
+    poscol <- pick_pos_col(P, poslab)
+    return(as.numeric(P[, poscol, drop = TRUE]))
+  }
+
+  if (inherits(mdl, "train")) { # caret
+    P <- predict(mdl, D, type = "prob")
+    P <- as.data.frame(P)
+    if (!(poslab %in% colnames(P))) {
+      mn <- make.names(colnames(P))
+      if (poslab %in% mn) poslab <- colnames(P)[match(poslab, mn)]
     }
+    return(as.numeric(P[[poslab]]))
+  }
+
+  if (inherits(mdl, "glm")) {   # binomial
+    P <- predict(mdl, newdata = D, type = "response")
+    return(as.numeric(P))
+  }
+
+  details <- paste(class(mdl), collapse = ", ")
+  msg <- paste0("Unsupported final_model class: ", details)
+  stop(msg)
+}
+}
     # ---------------------------------------------------------------------------
 
     # quick sanity check
@@ -294,11 +329,15 @@ factor_dependence <- function(
     # z-score per gene (genes x samples -> z, then transpose to samples x genes via 'contr' step)
     z <- t(scale(t(expr))); z[is.na(z)] <- 0
 
-    imp <- fit@imp$importance; names(imp) <- fit@imp$gene
-    dirv <- if ("signed_importance" %in% names(fit@imp)) {
-      d <- ifelse(fit@imp$direction > 0, 1, -1); names(d) <- fit@imp$gene; d
+    imp <- imp0$importance
+    names(imp) <- imp0$gene
+
+    dirv <- if ("signed_importance" %in% names(imp0)) {
+    d <- ifelse(imp0$direction > 0, 1, -1)
+    names(d) <- imp0$gene
+    d
     } else {
-      setNames(rep(1, nrow(fit@imp)), fit@imp$gene)
+    setNames(rep(1, nrow(imp0)), imp0$gene)
     }
 
     g <- intersect(rownames(expr), names(imp))
@@ -329,8 +368,8 @@ factor_dependence <- function(
       v <- contr[, gn]
 
       if (is.numeric(xcv)) {
-        r_v <- resid(stats::lm(v ~ y))
-        r_x <- resid(stats::lm(xcv ~ y))
+        r_v <- resid(lm(v ~ y))
+        r_x <- resid(lm(xcv ~ y))
         ct  <- stats::cor.test(r_v, r_x, method = "spearman", exact = FALSE)
         res[[k]] <- data.frame(
           gene = gn, covariate = cv, test = "partial Spearman",
@@ -340,8 +379,8 @@ factor_dependence <- function(
         )
       } else {
         xcvf <- droplevels(as.factor(xcv))
-        fit_lm <- stats::lm(v ~ y + xcvf)
-        a <- stats::anova(fit_lm)
+        fit_lm <- lm(v ~ y + xcvf)
+        a <- anova(fit_lm)
         p <- tryCatch(a["xcvf", "Pr(>F)"], error = function(e) NA_real_)
         means <- tapply(v, xcvf, mean, na.rm = TRUE)
         rng <- if (all(is.finite(means))) diff(range(means)) else NA_real_
@@ -355,7 +394,7 @@ factor_dependence <- function(
   }
 
   out <- do.call(rbind, res)
-  out$fdr <- stats::p.adjust(out$pval, method = fdr_method)
+  out$fdr <- p.adjust(out$pval, method = fdr_method)
   out$dependent <- out$fdr <= 0.05
   rownames(out) <- NULL
   attr(out, "method")     <- used

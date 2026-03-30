@@ -11,8 +11,8 @@ Package-level documentation and imports.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/USER/RFGeneRank}
-  \item Report bugs at \url{https://github.com/USER/RFGeneRank/issues}
+  \item \url{https://github.com/Abdulaziz-Albeshri/RFGeneRank}
+  \item Report bugs at \url{https://github.com/Abdulaziz-Albeshri/RFGeneRank/issues}
 }
 
 }

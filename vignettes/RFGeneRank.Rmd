@@ -9,7 +9,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -41,7 +41,7 @@ in a Bioconductor-compatible framework using standard data containers.
 
 # Installation
 
-```{r, eval=FALSE}
+```{r session-info, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install("RFGeneRank")
@@ -56,7 +56,7 @@ This vignette demonstrates the core protocol used in RFGeneRank:
 3. Run `rank_genes()`.
 4. Run a small set of downstream functions and basic plots.
 
-```{r}
+```{r package-overview}
 suppressPackageStartupMessages({
   library(RFGeneRank)
   library(SummarizedExperiment)
@@ -108,7 +108,7 @@ se
 
 # Step 1: prepare_data()
 
-```{r}
+```{r simulate-expression}
 # Detect whether the matrix is count-like (integer); our simulated data are continuous.
 is_integerish <- function(x) all(abs(x - round(x)) < 1e-8, na.rm = TRUE)
 counts_flag <- is_integerish(expr)
@@ -128,7 +128,7 @@ se_prep
 
 # Step 2: rank_genes()
 
-```{r}
+```{r build-se}
 cw <- c(CTRL = 1, CASE = 2)
 
 fit <- rank_genes(
@@ -151,13 +151,13 @@ fit
 
 ## Top genes
 
-```{r}
+```{r run-rank-genes}
 top_genes(fit, n = 10)
 ```
 
 ## Signed importance (directionality)
 
-```{r}
+```{r inspect-fit}
 tab_signed <- sign_importance(
   fit, se_prep,
   y = SummarizedExperiment::colData(se_prep)[["state"]],
@@ -169,7 +169,7 @@ head(tab_signed, 10)
 
 ## Basic plots
 
-```{r}
+```{r plotting-example}
 plot_importance(
   fit,
   top = 20,
@@ -187,6 +187,6 @@ plot_sign_importance(
 
 # Session information
 
-```{r}
+```{r session}
 sessionInfo()
 ```

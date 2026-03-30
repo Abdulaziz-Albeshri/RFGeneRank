@@ -47,6 +47,7 @@
 #' }
 #'
 #' Align and merge expression + metadata ...
+#' @importFrom stats complete.cases
 #' @examples
 #' # Single toy dataset: expression matrix (genes x samples)
 #' expr <- matrix(
@@ -197,7 +198,7 @@ align_datasets <- function(expr_list,
       " due to missing metadata values.\n",
       "  * Affected columns included: ", paste(unique(affected_cols), collapse = ", "), "\n",
       "  * Example dropped sample IDs: ",
-      paste(head(dropped_ids, 5), collapse = ", "),
+      paste(head(dropped_ids, 5), collapse = ", "), # show only the first few dropped IDs to keep diagnostic messages concise
       if (N > 5) ", ..." else ""
     )
     warning(msg, call. = FALSE)
@@ -235,7 +236,7 @@ align_datasets <- function(expr_list,
     }
 
     # ---- Strict NA policy: drop any row with any NA (warn + report)
-    na_mask <- !stats::complete.cases(M)
+    na_mask <- !complete.cases(M)
     drop_ids <- rownames(M)[na_mask]
     aff_cols <- names(M)[colSums(is.na(M)) > 0]
     drop_info <- warn_na_drops(ds, drop_ids, aff_cols)
@@ -311,9 +312,9 @@ align_datasets <- function(expr_list,
     msg <- paste0(
       "Final alignment failed: colnames(expr) != rownames(metadata).\n",
       "  length(expr cols) = ", ncol(X_merged), ", length(meta rows) = ", nrow(M_merged), "\n",
-      "  First mismatches at positions: ", paste(head(bad, 10), collapse = ", "), "\n",
-      "  Example expr IDs: ", paste(head(colnames(X_merged)[bad], 5), collapse = ", "), "\n",
-      "  Example meta IDs: ", paste(head(rownames(M_merged)[bad], 5), collapse = ", ")
+      "  First mismatches at positions: ", paste(head(bad, 10), collapse = ", "), "\n", # report only the first few mismatch positions to avoid overly long error messages
+      "  Example expr IDs: ", paste(head(colnames(X_merged)[bad], 5), collapse = ", "), "\n", # include only a small preview of mismatched expression IDs for readability
+      "  Example meta IDs: ", paste(head(rownames(M_merged)[bad], 5), collapse = ", ") # include only a small preview of mismatched metadata IDs for readability
     )
     stop(msg)
   }

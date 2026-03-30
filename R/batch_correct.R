@@ -28,7 +28,6 @@
   X
 }
 
-`%||%` <- function(a, b) if (!is.null(a)) a else b
 
 # Robust linear solve: (X'X + lambda I)^{-1} X'Y with fallback to pseudoinverse
 .solve_beta <- function(Xtr, Ytr, lambda = 1e-6) {

@@ -7,7 +7,7 @@
 apply_calibration(fit, p)
 }
 \arguments{
-\item{fit}{GeneRankFit with a non-empty \verb{@calibration} slot}
+\item{fit}{GeneRankFit with stored calibration information.}
 
 \item{p}{numeric vector of positive-class probabilities}
 }

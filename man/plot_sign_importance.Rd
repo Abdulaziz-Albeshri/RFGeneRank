@@ -39,7 +39,7 @@ A ggplot object.
 }
 \description{
 Visualizes direction-aware importances produced by \code{sign_importance()}.
-If \code{tab} is NULL, the function will try to read \code{fit@imp} and
+If \code{tab} is NULL, the function will try to read the stored importance table and
 require a \code{signed_importance} column to be present there.
 }
 \examples{
@@ -52,14 +52,4 @@ signed_imp <- data.frame(
 
 head(signed_imp)
 
-\donttest{
-# In practice, plot_sign_importance() is used on a GeneRankFit object
-# after computing signed importances, for example:
-#
-#   fit <- gene_rank(se, genes = rownames(se), ...)
-#   sig_imp <- sign_importance(fit, X = expr_matrix, y = outcome)
-#   plot_sign_importance(fit, top_n = 20)
-#
-# where the sign and magnitude of each gene's contribution are visualized.
-}
 }

@@ -48,7 +48,7 @@ list(auc_by_fold, mean_auc, settings, folds_info)
 Orchestrates leakage-safe CV for RFGeneRank with two ComBat modes:
 \itemize{
 \item "none":     no batch correction
-\item "train":    frozen ComBat - fit on TRAIN folds only; apply TRAIN parameters to TEST
+\item "train":    train-only batch correction with leakage-safe application to TEST
 }
 
 Supports LOBO (leave-one-batch-out), Group K-Fold by batch, and standard K-Fold.

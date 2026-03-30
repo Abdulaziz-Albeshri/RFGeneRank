@@ -68,25 +68,25 @@ fit <- rank_genes(
   trees     = 100
 )
 
-# For this example, ensure fit@imp has signed_importance information
+# For this example, ensure the stored importance table has signed_importance information
 # required by plot_sign_importance().
-if (is.null(fit@imp)) {
-  ng <- nrow(expr)
-  fit@imp <- data.frame(
-    gene             = rownames(expr),
-    importance       = seq_len(ng),
-    direction        = rep(1L, ng),
-    signed_importance = seq_len(ng),
+imp0 <- imp(fit)
+if (is.null(imp0)) {
+  imp0 <- data.frame(
+    gene = character(),
+    importance = numeric(),
+    direction = integer(),
+    signed_importance = numeric(),
     stringsAsFactors = FALSE
   )
-} else {
-  if (!"direction" \%in\% colnames(fit@imp)) {
-    fit@imp$direction <- 1L
-  }
-  if (!"signed_importance" \%in\% colnames(fit@imp)) {
-    fit@imp$signed_importance <- fit@imp$importance * fit@imp$direction
-  }
 }
+if (!"direction" \%in\% colnames(imp0)) {
+  imp0$direction <- 1L
+}
+if (!"signed_importance" \%in\% colnames(imp0)) {
+  imp0$signed_importance <- imp0$importance * imp0$direction
+}
+imp(fit) <- imp0
 
 # Generate a suite of diagnostic plots (returned as a list of ggplot objects)
 plots <- rfgr_plot_suite(fit, se)

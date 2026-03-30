@@ -53,16 +53,4 @@ y <- factor(rep(c("A", "B"), each = 10))
 # Inspect inputs
 head(X)
 
-\donttest{
-# In practice, shap_train_ranger() computes a SHAP matrix using a single
-# ranger model. A typical call is:
-#
-#   shap_obj <- shap_train_ranger(
-#     X    = X,
-#     y    = y,
-#     nsim = 128
-#   )
-#
-# where 'shap_obj' contains the SHAP values for each feature.
-}
 }

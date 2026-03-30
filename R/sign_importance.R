@@ -16,7 +16,9 @@
 .rfgr_try_get_y <- function(fit) {
   y <- NULL
   try({ if (!is.null(fit$oof$y))  y <- fit$oof$y }, silent = TRUE)
-  try({ if (!is.null(fit@oof$y))  y <- fit@oof$y }, silent = TRUE)
+  try({oof0 <- .rfgr_oof(fit)
+  if (!is.null(oof0$y)) y <- oof0$y
+  }, silent = TRUE)
   try({ if (!is.null(fit$trainingData$.outcome)) y <- fit$trainingData$.outcome }, silent = TRUE)
   try({ if (!is.null(fit$y)) y <- fit$y }, silent = TRUE)
   y
@@ -25,20 +27,22 @@
 .rfgr_get_importance <- function(fit) {
   imp <- NULL
 
-  # 0) RFGeneRank pipeline: importance lives in fit@imp (data.frame with gene, importance)
+  # 0) RFGeneRank pipeline: importance is stored as a data.frame with columns gene, importance
   try({
-    if (!is.null(fit@imp) && is.data.frame(fit@imp) &&
-        all(c("gene","importance") %in% colnames(fit@imp))) {
-      v <- fit@imp$importance
-      names(v) <- fit@imp$gene
+    imp0 <- .rfgr_imp(fit)
+    if (!is.null(imp0) && is.data.frame(imp0) &&
+    all(c("gene","importance") %in% colnames(imp0))) {
+    v <- imp0$importance
+    names(v) <- imp0$gene
       imp <- v
     }
   }, silent = TRUE)
 
-  # 1) ranger object stored in fit@model (some wrappers)
+  # 1) ranger object stored in the model component (some wrappers)
   if (is.null(imp)) try({
-    if (!is.null(fit@model$variable.importance))
-      imp <- fit@model$variable.importance
+    mdl1 <- .rfgr_model(fit)
+    if (!is.null(mdl1$variable.importance))
+    imp <- mdl1$variable.importance
   }, silent = TRUE)
 
   # 2) plain ranger object
@@ -55,11 +59,14 @@
 
   # return named numeric vector or NULL
   if (!is.null(imp)) {
-    if (is.null(names(imp)) && !is.null(fit@imp$gene)) {
-      names(imp) <- fit@imp$gene
-    }
-    return(imp)
+  imp0 <- try(.rfgr_imp(fit), silent = TRUE)
+  if (inherits(imp0, "try-error")) imp0 <- NULL
+
+  if (is.null(names(imp)) && !is.null(imp0) && !is.null(imp0$gene)) {
+    names(imp) <- imp0$gene
   }
+  return(imp)
+}
   NULL
 }
 

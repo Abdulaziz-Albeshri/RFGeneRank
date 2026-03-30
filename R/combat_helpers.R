@@ -6,7 +6,9 @@
 #' @noRd
 .to_mm0 <- function(df) {
   if (is.null(df) || ncol(df) == 0L) return(NULL)
-  for (j in seq_along(df)) if (is.character(df[[j]])) df[[j]] <- factor(df[[j]])
+  df[] <- lapply(df, function(x) {
+  if (is.character(x)) factor(x) else x
+})
   stats::model.matrix(~ 0 + ., data = df)
 }
 

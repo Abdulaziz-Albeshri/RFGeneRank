@@ -7,12 +7,12 @@
 calibrate_oof(fit, method = c("isotonic", "platt"))
 }
 \arguments{
-\item{fit}{GeneRankFit (with fit@oof$prob and fit@oof$y)}
+\item{fit}{GeneRankFit containing out-of-fold predictions and labels.}
 
 \item{method}{"isotonic" or "platt"}
 }
 \value{
-GeneRankFit with a non-empty \verb{@calibration} slot
+GeneRankFit with stored calibration information.
 }
 \description{
 Fits a calibration model on the out-of-fold (OOF) positive-class probabilities
@@ -28,9 +28,7 @@ fit0 <- methods::new("GeneRankFit")
 apply_calibration(fit0, p)
 
 # Case 2: simple calibration function (illustration)
-\donttest{
-  fit1 <- methods::new("GeneRankFit")
-  fit1@calibration <- list(fun = function(x) x^0.8)
-  apply_calibration(fit1, p)
-}
+fit1 <- methods::new("GeneRankFit")
+calibration(fit1) <- list(fun = function(x) x^0.8)
+apply_calibration(fit1, p)
 }

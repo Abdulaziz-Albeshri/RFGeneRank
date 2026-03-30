@@ -22,9 +22,9 @@ factor_dependence(
 )
 }
 \arguments{
-\item{fit}{Trained object with OOF slots: fit@oof$prob (n x k), fit@oof$y (factor).
+\item{fit}{Trained object containing out-of-fold predictions (n x k) and labels.
 For S4 wrappers (e.g., GeneRankFit), the finalized learner should be in
-fit@final_model and the training features in fit@features. If missing,
+A final fitted model and the training feature names may also be present.
 this function will train a temporary full-data model on-the-fly (not saved).}
 
 \item{se}{SummarizedExperiment with assay "expr" (genes x samples).}

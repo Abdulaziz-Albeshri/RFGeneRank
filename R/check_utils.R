@@ -22,7 +22,7 @@
 
 .message_once <- function(...) message(...)
 
-# Lightweight seed helper (works even if users set RNG elsewhere)
-.set_seed <- function(seed) {
-  invisible(NULL)
+# NULL-coalescing helper
+`%||%` <- function(a, b) {
+  if (is.null(a)) b else a
 }

@@ -2,7 +2,7 @@
 # S4 class that carries CV params, OOF predictions, importances,
 # finalized model, and optional calibration function.
 
-setClass(
+methods::setClass(
   "GeneRankFit",
   slots = c(
     params       = "list",         # training params & metadata
@@ -23,36 +23,41 @@ setClass(
     calibration  = list()          # <-- IMPORTANT: empty list, not NULL
   ),
   validity = function(object) {
-    msgs <- character()
+  msgs <- character()
 
-    # oof minimal structure check (lenient to allow partial fits)
-    if (length(object@oof)) {
-      if (is.null(object@oof$prob) || is.null(object@oof$y)) {
-        msgs <- c(msgs, "'oof' must contain at least $prob and $y")
-      } else {
-        if (!is.matrix(object@oof$prob)) msgs <- c(msgs, "oof$prob must be a matrix")
-        if (!is.factor(object@oof$y))   msgs <- c(msgs, "oof$y must be a factor")
-      }
+  # oof minimal structure check (lenient to allow partial fits)
+  oof0 <- .rfgr_oof(object)
+  if (length(oof0)) {
+    if (is.null(oof0$prob) || is.null(oof0$y)) {
+      msgs <- c(msgs, "'oof' must contain at least $prob and $y")
+    } else {
+      if (!is.matrix(oof0$prob)) msgs <- c(msgs, "oof$prob must be a matrix")
+      if (!is.factor(oof0$y))   msgs <- c(msgs, "oof$y must be a factor")
     }
+  }
 
-    # calibration must be a list (possibly empty) with optional $method and $fun
-    if (!is.list(object@calibration)) {
-      msgs <- c(msgs, "'calibration' must be a list (use list() when unset)")
-    } else if (!is.null(object@calibration$fun) && !is.function(object@calibration$fun)) {
-      msgs <- c(msgs, "'calibration$fun' must be a function")
-    }
+  # calibration must be a list (possibly empty) with optional $method and $fun
+  cal0 <- .rfgr_calibration(object)
+  if (!is.list(cal0)) {
+    msgs <- c(msgs, "'calibration' must be a list (use list() when unset)")
+  } else if (!is.null(cal0$fun) && !is.function(cal0$fun)) {
+    msgs <- c(msgs, "'calibration$fun' must be a function")
+  }
 
-    if (length(msgs)) msgs else TRUE
+  if (length(msgs)) msgs else TRUE
   }
 )
 
 # Pretty show method (minimal)
-setMethod("show", "GeneRankFit", function(object) {
+methods::setMethod("show", "GeneRankFit", function(object) {
   cat("GeneRankFit\n")
-  if (length(object@params)) {
-    p <- object@params
+
+  pars <- .rfgr_params(object)
+  if (length(pars)) {
+    p <- pars
     cat(sprintf("  k=%s, trees=%s, importance=%s\n",
                 as.character(p$k), as.character(p$trees), as.character(p$importance)))
+
     if (!is.null(p$fold_batch_correction) && isTRUE(p$fold_batch_correction)) {
       cat("  fold-safe batch correction: ON\n")
     }
@@ -66,20 +71,25 @@ setMethod("show", "GeneRankFit", function(object) {
       cat("  standardize: z-score by train mean/SD\n")
     }
   }
-  if (nrow(object@imp)) {
-    cat(sprintf("  features ranked: %d\n", nrow(object@imp)))
+
+  imp0 <- .rfgr_imp(object)
+  if (nrow(imp0)) {
+    cat(sprintf("  features ranked: %d\n", nrow(imp0)))
   }
-  if (!is.null(object@final_model)) {
+
+  mdl0 <- .rfgr_final_model(object)
+  if (!is.null(mdl0)) {
     cat("  finalized model: PRESENT\n")
   } else {
     cat("  finalized model: <none>\n")
   }
-  if (length(object@calibration) && is.character(object@calibration$method)) {
-    cat(sprintf("  calibration: %s\n", object@calibration$method))
+
+  cal0 <- .rfgr_calibration(object)
+  if (length(cal0) && is.character(cal0$method)) {
+    cat(sprintf("  calibration: %s\n", cal0$method))
   } else {
     cat("  calibration: <none>\n")
   }
 })
 
-# small infix helper for show()
-`%||%` <- function(a, b) if (is.null(a)) b else a
+

@@ -21,7 +21,7 @@ plot_shap_dependence(
 )
 }
 \arguments{
-\item{fit}{GeneRankFit (must have fit@oof$prob and labels in colData(se)$state).}
+\item{fit}{GeneRankFit containing out-of-fold predictions and labels.}
 
 \item{se}{SummarizedExperiment with assay "expr".}
 

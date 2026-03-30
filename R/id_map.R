@@ -35,11 +35,11 @@ id_map <- function(keys,
 
   # Run mapping
   res <- AnnotationDbi::select(
-    OrgDb,
-    keys   = unique(keys),
-    keytype = from,
-    columns = to
-  )
+  OrgDb,
+  keys   = base::unique(keys),
+  keytype = from,
+  columns = to
+)
 
   # Keep only requested columns; rename consistently
   res <- res[, c(from, to), drop = FALSE]

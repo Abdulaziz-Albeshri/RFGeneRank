@@ -3,14 +3,14 @@
 #' Extract top predictive genes from a GeneRankFit
 #'
 #' Returns a ranked list from the aggregated, fold-normalized importance
-#' stored in \code{fit@imp}. Optionally adds an ID mapping column (e.g.,
+#' stored in the fitted object. Optionally adds an ID mapping column (e.g.,
 #' ENTREZID -> SYMBOL) using \code{\link{id_map}}.
 #'
 #' @param fit a \code{GeneRankFit} object (from \code{rank_genes()}).
 #' @param n integer; number of top genes to return (default 100).
 #' @param map logical; if TRUE, map \code{from -> to} and add a \code{mapped} column.
 #' @param OrgDb an \code{OrgDb} object for mapping (default \code{org.Hs.eg.db}).
-#' @param from source keytype used in \code{fit@imp$gene} (e.g., "ENTREZID", "SYMBOL", "ENSEMBL").
+#' @param from source keytype used for the gene identifiers (e.g., "ENTREZID", "SYMBOL", "ENSEMBL").
 #' @param to destination keytype (e.g., "SYMBOL").
 #'
 #' @return 
@@ -49,9 +49,9 @@ top_genes <- function(fit,
   if (!inherits(fit, "GeneRankFit"))
     stop("fit must be a GeneRankFit.", call. = FALSE)
 
-  imp <- fit@imp
+  imp <- .rfgr_imp(fit)
   if (!is.data.frame(imp) || !all(c("gene", "importance") %in% names(imp))) {
-    stop("fit@imp is missing required columns 'gene' and 'importance'.", call. = FALSE)
+    stop("Stored importance table is missing required columns 'gene' and 'importance'.", call. = FALSE)
   }
 
   # Order by importance (already aggregated across folds) and take top n
@@ -59,7 +59,7 @@ top_genes <- function(fit,
   if (nrow(df) == 0L) {
     return(list(gene = character(0), table = df))
   }
-  df <- head(df, n)
+  df <- head(df, n) # return only the top n ranked genes
 
   # Optional ID mapping
   if (isTRUE(map)) {

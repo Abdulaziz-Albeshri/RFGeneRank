@@ -7,7 +7,7 @@
 plot_roc(fit)
 }
 \arguments{
-\item{fit}{GeneRankFit with \code{fit@oof$prob} and \code{fit@oof$y}}
+\item{fit}{GeneRankFit with stored out-of-fold predictions and labels.}
 }
 \value{
 A \code{ggplot2} object containing the ROC curve derived from

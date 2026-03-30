@@ -14,7 +14,7 @@ plot_embed_expr(
   min_dist = 0.1,
   metric = "euclidean",
   zscore = TRUE,
-  seed = fit@params$seed,
+  seed = NULL,
   point_size = 2,
   show_legend = TRUE,
   palette = NULL
@@ -35,7 +35,7 @@ plot_embed_expr(
 
 \item{zscore}{Logical; z-score samples x genes matrix before embedding (default TRUE)}
 
-\item{seed}{RNG seed for UMAP reproducibility (default \code{fit@params$seed})}
+\item{seed}{RNG seed for UMAP reproducibility (default uses stored pipeline seed if available).}
 
 \item{point_size}{numeric}
 
@@ -55,7 +55,7 @@ For UMAP, the title shows the engine and key parameters used.
 # For reproducibility, specify a fixed seed (e.g., set.seed(1)) before running this example.
 
 # Toy expression: 15 genes × 8 samples
-expr <- matrix(stats::rnorm(15 * 8), nrow = 15)
+expr <- matrix(rnorm(15 * 8), nrow = 15)
 rownames(expr) <- paste0("gene", 1:15)
 colnames(expr) <- paste0("sample", 1:8)
 
@@ -69,16 +69,4 @@ se <- SummarizedExperiment::SummarizedExperiment(
 
 se
 
-\donttest{
-# In practice, plot_embed_expr() uses the expression assay directly,
-# for example:
-#
-#   plot_embed_expr(
-#     se,
-#     label_col = "label",
-#     method    = "PCA"
-#   )
-#
-# to visualize sample-level embeddings coloured by the outcome.
-}
 }

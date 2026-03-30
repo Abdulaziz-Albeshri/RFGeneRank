@@ -22,7 +22,7 @@ top_genes(
 
 \item{OrgDb}{an \code{OrgDb} object for mapping (default \code{org.Hs.eg.db}).}
 
-\item{from}{source keytype used in \code{fit@imp$gene} (e.g., "ENTREZID", "SYMBOL", "ENSEMBL").}
+\item{from}{source keytype used for the gene identifiers (e.g., "ENTREZID", "SYMBOL", "ENSEMBL").}
 
 \item{to}{destination keytype (e.g., "SYMBOL").}
 }
@@ -36,7 +36,7 @@ A list with:
 }
 \description{
 Returns a ranked list from the aggregated, fold-normalized importance
-stored in \code{fit@imp}. Optionally adds an ID mapping column (e.g.,
+stored in the fitted object. Optionally adds an ID mapping column (e.g.,
 ENTREZID -> SYMBOL) using \code{\link{id_map}}.
 }
 \examples{

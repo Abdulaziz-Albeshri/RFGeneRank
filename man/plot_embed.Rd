@@ -8,10 +8,10 @@ plot_embed(
   fit,
   type = c("pca", "umap"),
   engine = c("umap", "uwot"),
-  neighbors = fit@params$umap$neighbors \%||\% 15,
-  min_dist = fit@params$umap$min_dist \%||\% 0.1,
-  metric = fit@params$umap$metric \%||\% "cosine",
-  seed = fit@params$seed \%||\% 1,
+  neighbors = NULL,
+  min_dist = NULL,
+  metric = NULL,
+  seed = NULL,
   point_size = 2,
   show_legend = TRUE,
   palette = NULL
@@ -45,21 +45,11 @@ Good for inspecting decision geometry; for biology structure, prefer \code{plot_
 # Toy 2D embedding for 10 samples
 embed_df <- data.frame(
   sample = paste0("sample", 1:10),
-  dim1   = stats::rnorm(10),
-  dim2   = stats::rnorm(10),
+  dim1   = rnorm(10),
+  dim2   = rnorm(10),
   label  = factor(rep(c("A", "B"), each = 5))
 )
 
 head(embed_df)
 
-\donttest{
-# In practice, plot_embed() is used on a GeneRankFit object
-# produced by the RFGeneRank workflow, for example:
-#
-#   fit <- gene_rank(se, genes = rownames(se), ...)
-#   plot_embed(fit, palette = c("A" = "#1f77b4", "B" = "#ff7f0e"))
-#
-# where the embedding (e.g. PCA / UMAP) is stored inside 'fit'
-# and coloured by the outcome or another covariate.
-}
 }

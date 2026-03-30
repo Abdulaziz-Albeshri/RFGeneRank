@@ -3,10 +3,10 @@
 #'
 #' Fits a calibration model on the out-of-fold (OOF) positive-class probabilities
 #' and stores it inside the GeneRankFit object. No data leakage: uses OOF only.
-#'
-#' @param fit GeneRankFit (with fit@oof$prob and fit@oof$y)
+#' @importFrom stats predict
+#' @param fit GeneRankFit containing out-of-fold predictions and labels.
 #' @param method "isotonic" or "platt"
-#' @return GeneRankFit with a non-empty `@calibration` slot
+#' @return GeneRankFit with stored calibration information.
 #' @examples
 #'
 #' # Example probabilities
@@ -17,16 +17,16 @@
 #' apply_calibration(fit0, p)
 #'
 #' # Case 2: simple calibration function (illustration)
-#' \donttest{
-#'   fit1 <- methods::new("GeneRankFit")
-#'   fit1@calibration <- list(fun = function(x) x^0.8)
-#'   apply_calibration(fit1, p)
-#' }
+#' fit1 <- methods::new("GeneRankFit")
+#' calibration(fit1) <- list(fun = function(x) x^0.8)
+#' apply_calibration(fit1, p)
 #' @export
 calibrate_oof <- function(fit, method = c("isotonic","platt")) {
   method <- match.arg(method)
   if (!inherits(fit, "GeneRankFit")) stop("fit must be GeneRankFit.")
-  prob <- fit@oof$prob; y <- fit@oof$y
+  oof <- .rfgr_oof(fit)
+  prob <- oof$prob
+  y <- oof$y
   stopifnot(!is.null(prob), !is.null(y))
   sids <- rownames(prob)
   if (is.null(sids)) stop("oof$prob must have rownames (sample IDs).")
@@ -43,8 +43,8 @@ calibrate_oof <- function(fit, method = c("isotonic","platt")) {
     # logistic regression on scores
     df  <- data.frame(y = lbl, p = p)
     mdl <- stats::glm(y ~ p, family = stats::binomial(), data = df)
-    cal_fun <- function(x) as.numeric(stats::predict(mdl, newdata = data.frame(p = as.numeric(x)), type = "response"))
-    fit@calibration <- list(method = "platt", fun = cal_fun)
+    cal_fun <- function(x) as.numeric(predict(mdl, newdata = data.frame(p = as.numeric(x)), type = "response"))
+    fit <- .rfgr_calibration_set(fit, list(method = "platt", fun = cal_fun))
     return(fit)
   }
 
@@ -71,13 +71,13 @@ calibrate_oof <- function(fit, method = c("isotonic","platt")) {
     as.numeric(z)
   }
 
-  fit@calibration <- list(method = "isotonic", fun = cal_fun)
+  fit <- .rfgr_calibration_set(fit, list(method = "isotonic", fun = cal_fun))
   fit
 }
 
 #' Apply stored calibration to a numeric vector of probabilities
 #'
-#' @param fit GeneRankFit with a non-empty `@calibration` slot
+#' @param fit GeneRankFit with stored calibration information.
 #' @param p numeric vector of positive-class probabilities
 #' @return numeric vector of calibrated probabilities (or original if none stored)
 #' @export
@@ -91,8 +91,9 @@ calibrate_oof <- function(fit, method = c("isotonic","platt")) {
 #' apply_calibration(fit0, p)
 apply_calibration <- function(fit, p) {
   if (!inherits(fit, "GeneRankFit")) stop("fit must be GeneRankFit.")
-  if (is.list(fit@calibration) && is.function(fit@calibration$fun)) {
-    return(fit@calibration$fun(p))
-  }
+  cal <- .rfgr_calibration(fit)
+  if (is.list(cal) && is.function(cal$fun)) {
+  return(cal$fun(p))
+}
   p
 }

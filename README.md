@@ -1,8 +1,7 @@
 # RFGeneRank
 
-RFGeneRank is an R package that implements a machine-learning–based,
-batch-aware workflow for gene ranking and disease classification 
-using bulk RNA-seq data.
+RFGeneRank implements a cross-validation–based framework for stable gene ranking 
+from bulk RNA-seq data, incorporating batch-aware modeling and interpretable feature importance.
 
 ## Installation
 

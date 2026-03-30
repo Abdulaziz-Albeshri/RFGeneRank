@@ -24,6 +24,8 @@
 #'   \code{$calibrator_requested}, \code{$calibrator_used}, \code{$threshold},
 #'   \code{$conf_mat}, and \code{$metrics} with both diagnostics (raw/cal)
 #'   and final guardrailed metrics (\code{auc_final}, \code{ece_final}, \code{brier_final}).
+#' @importFrom pROC roc coords auc
+#' @importFrom stats predict
 #' @examples
 #' # Toy expression matrix: 10 genes x 12 samples
 #' expr <- matrix(
@@ -76,15 +78,20 @@ validate_genes <- function(
   thr_metric <- match.arg(thr_metric)
   methods    <- unique(methods)
 
-  Xall <- SummarizedExperiment::assay(se)
-  if (missing(genes) || is.null(genes) || !length(genes)) {
-    stop("Please provide a non-empty character vector `genes` (e.g., top_genes(fit, n=100)$gene).")
-  }
-  if (!all(genes %in% rownames(Xall))) {
-    miss <- setdiff(genes, rownames(Xall))
-    stop("Missing genes in assay(se): ", paste(miss, collapse = ", "))
-  }
-  X <- Xall[genes, , drop = FALSE]
+ Xall <- SummarizedExperiment::assay(se)
+
+if (missing(genes) || is.null(genes) || !length(genes)) {
+  stop("Please provide a non-empty character vector genes (e.g., top_genes(fit, n=100)$gene).")
+}
+
+if (!all(genes %in% rownames(Xall))) {
+  miss <- setdiff(genes, rownames(Xall))
+  details <- paste(miss, collapse = ", ")
+  msg <- paste0("Missing genes in assay(se): ", details)
+  stop(msg)
+}
+
+X <- Xall[genes, , drop = FALSE]
 
   y <- SummarizedExperiment::colData(se)[[label_col]]
   if (!is.factor(y)) y <- factor(y)
@@ -101,9 +108,6 @@ validate_genes <- function(
   
   folds <- caret::createFolds(y, k = k, returnTrain = TRUE)
   if (!length(folds)) stop("Could not create CV folds.")
-
-  # ---- helpers --------------------------------------------------------------
-  `%||%` <- function(x, y) if (is.null(x)) y else x
 
   compute_class_weights <- function(y) {
     p <- table(y)/length(y)
@@ -164,7 +168,7 @@ validate_genes <- function(
     if (!inherits(m, "try-error") && !warn_flag && all(is.finite(stats::coef(m)))) {
       function(p) {
         lp <- stats::qlogis(pmin(pmax(p, eps), 1 - eps))
-        stats::plogis(stats::predict(m, newdata = data.frame(ltr = lp), type = "link"))
+        stats::plogis(predict(m, newdata = data.frame(ltr = lp), type = "link"))
       }
     } else {
       iso <- isotonic_calibrator(p_tr, y_tr)
@@ -179,11 +183,11 @@ validate_genes <- function(
 
   # Threshold selection on provided probabilities
   choose_threshold <- function(p, y, metric = thr_metric, cost = cost) {
-    roc <- pROC::roc(response = y, predictor = p, levels = rev(lev), quiet = TRUE)
+    roc <- roc(response = y, predictor = p, levels = rev(lev), quiet = TRUE)
     if (metric == "youden") {
-      as.numeric(pROC::coords(roc, "best", best.method = "youden", ret = "threshold"))
+      as.numeric(coords(roc, "best", best.method = "youden", ret = "threshold"))
     } else if (metric == "f1") {
-      cand <- as.numeric(pROC::coords(roc, x = "threshold", ret = "threshold"))
+      cand <- as.numeric(coords(roc, x = "threshold", ret = "threshold"))
       f1s <- vapply(cand, function(t) {
         levs <- levels(y)
         pr  <- factor(ifelse(p >= t, levs[2], levs[1]), levels = levs)
@@ -292,8 +296,8 @@ validate_genes <- function(
       )
       bst <- xgboost::xgb.train(params = param, data = dtr,
                                 nrounds = params$nrounds %||% 400, verbose = 0)
-      p_tr <- stats::predict(bst, dtr)
-      p_te <- stats::predict(bst, dte)
+      p_tr <- predict(bst, dtr)
+      p_te <- predict(bst, dte)
       return(list(p_tr = as.numeric(p_tr), p_te = as.numeric(p_te)))
 
     } else if (method == "ranger") {
@@ -346,8 +350,8 @@ validate_genes <- function(
     }
 
     # ---- OOF diagnostics: raw vs calibrated
-    roc_raw <- pROC::roc(response = y, predictor = p_raw, levels = rev(lev), quiet = TRUE)
-    roc_cal <- pROC::roc(response = y, predictor = p_cal, levels = rev(lev), quiet = TRUE)
+    roc_raw <- roc(response = y, predictor = p_raw, levels = rev(lev), quiet = TRUE)
+    roc_cal <- roc(response = y, predictor = p_cal, levels = rev(lev), quiet = TRUE)
 
     auc_raw <- as.numeric(pROC::auc(roc_raw))
     auc_cal <- as.numeric(pROC::auc(roc_cal))
@@ -368,8 +372,8 @@ validate_genes <- function(
     }
 
     # ---- Final metrics computed on the probabilities used in downstream evaluation
-    roc_use <- pROC::roc(response = y, predictor = p_use, levels = rev(lev), quiet = TRUE)
-    auc_use <- as.numeric(pROC::auc(roc_use))
+    roc_use <- roc(response = y, predictor = p_use, levels = rev(lev), quiet = TRUE)
+    auc_use <- as.numeric(auc(roc_use))
     ece_use <- ece_metric(p_use, y)
     br_use  <- brier(p_use, y)
 
@@ -415,9 +419,14 @@ validate_genes <- function(
   }
 
   # run and summarize
-  allowed <- c("ranger","glmnet","xgboost")
-  unknown <- setdiff(methods, allowed)
-  if (length(unknown)) stop("Unsupported methods: ", paste(unknown, collapse = ", "))
+ allowed <- c("ranger","glmnet","xgboost")
+unknown <- setdiff(methods, allowed)
+
+if (length(unknown)) {
+  details <- paste(unknown, collapse = ", ")
+  msg <- paste0("Unsupported methods: ", details)
+  stop(msg)
+}
 
   fits <- lapply(methods, run_one_method)
   names(fits) <- methods
