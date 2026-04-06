@@ -10,7 +10,9 @@ for submission to Bioconductor.
 
 ## Author
 
-Abdulaziz Albeshri (Maintainer)
+**Abdulaziz Albeshri** (Maintainer)
 
 ## Contributors
-See DESCRIPTION for full list of contributors.
+- **Thamer Ahmad Bouback**
+- **Majid Al-Zahrani**
+- **Tasneem Alsahafi**
