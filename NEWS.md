@@ -1,3 +1,7 @@
+# RFGeneRank 0.99.4
+
+* Updated R dependency to R (>= 4.6).
+
 # RFGeneRank 0.99.3
 
 * Replaced `class()` with `inherits()` in `sign_importance.R`.
