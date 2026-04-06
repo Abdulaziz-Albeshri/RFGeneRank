@@ -1,6 +1,6 @@
 Package: RFGeneRank
 Title: RFGeneRank: Cross-validated Stable Predictive Gene Ranking for Transcriptomics
-Version: 0.99.2
+Version: 0.99.3
 Authors@R: c(
     person("Abdulaziz", "Albeshri",
            email = "a.z.a1410@hotmail.com",
@@ -25,7 +25,7 @@ Description: Tools to harmonize bulk RNA-seq matrices, optionally apply batch co
 License: MIT + file LICENSE
 URL: https://github.com/Abdulaziz-Albeshri/RFGeneRank
 BugReports: https://github.com/Abdulaziz-Albeshri/RFGeneRank/issues
-Depends: R (>= 4.6.0)
+Depends: R (>= 4.5.0)
 Imports: ggplot2, limma, methods, pROC, ranger, stats,
         SummarizedExperiment, sva, AnnotationDbi, umap, scales, utils,
         S4Vectors, digest, mgcv, Matrix, glmnet, xgboost, patchwork

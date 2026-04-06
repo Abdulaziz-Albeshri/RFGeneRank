@@ -86,7 +86,7 @@
   if (inherits(fit, "randomForest")) {
     return(function(newdata) as.numeric(predict(fit, newdata, type = "prob")[, 2]))
   }
-  if ("train" %in% class(fit)) {
+  if (inherits(fit, "train")) {
     return(function(newdata) as.numeric(predict(fit, newdata, type = "prob")[, 2]))
   }
   if (!is.null(fit$predict_proba) && is.function(fit$predict_proba)) {

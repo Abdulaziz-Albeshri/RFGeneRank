@@ -1,4 +1,6 @@
-# RFGeneRank 0.99.2
+# RFGeneRank 0.99.3
+
+* Replaced `class()` with `inherits()` in `sign_importance.R`.
 
 * Increased test coverage (~70%).
 * Updated R dependency to R (>= 4.6).
